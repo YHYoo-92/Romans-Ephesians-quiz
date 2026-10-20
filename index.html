@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>말씀 퀴즈 (로마서·에베소서)</title>
+    <!-- Tailwind CSS 연동 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f3f4f6; }
+        .word-keep { word-break: keep-all; overflow-wrap: break-word; }
+        #progress-fill { transition: width 0.3s ease; }
+    </style>
+    <!-- 외부 말씀 데이터 불러오기 -->
+    <script src="bible_data.js"></script>
+</head>
+<body class="min-h-screen flex flex-col text-gray-800">
+
+    <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-10 text-sm">
+        <div class="max-w-4xl mx-auto">
+            <div class="h-1 bg-indigo-800 w-full">
+                <div id="progress-fill" class="h-full bg-green-400 w-0"></div>
+            </div>
+            
+            <div class="p-2 flex flex-col sm:flex-row gap-2 justify-between items-center">
+                <div class="flex gap-1 items-center w-full sm:w-auto">
+                    <select id="book-select" class="bg-indigo-700 border border-indigo-500 rounded px-2 py-1 outline-none flex-1 sm:flex-none cursor-pointer"></select>
+                    <select id="chapter-select" class="bg-indigo-700 border border-indigo-500 rounded px-2 py-1 outline-none flex-1 sm:flex-none cursor-pointer"></select>
+                    <select id="verse-select" class="bg-indigo-700 border border-indigo-500 rounded px-2 py-1 outline-none flex-1 sm:flex-none cursor-pointer"></select>
+                </div>
+
+                <div class="flex gap-2 w-full sm:w-auto text-xs font-medium">
+                    <button id="order-toggle" class="flex-1 sm:flex-none bg-indigo-500 hover:bg-indigo-400 px-3 py-1 rounded transition-colors">
+                        ➡️ 순차
+                    </button>
+                    <!-- 오답 복습 모드 버튼 추가 -->
+                    <button id="review-toggle" class="flex-1 sm:flex-none bg-amber-500 hover:bg-amber-400 px-3 py-1 rounded transition-colors font-bold shadow-sm">
+                        🔥 오답 복습
+                    </button>
+                    <button id="note-btn" class="flex-1 sm:flex-none bg-rose-500 hover:bg-rose-400 px-3 py-1 rounded transition-colors">
+                        📝 오답노트
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-4xl w-full mx-auto p-4 flex flex-col justify-center">
+        <div id="quiz-card" class="bg-white rounded-xl shadow-lg p-5 sm:p-8 w-full border-t-4 border-indigo-500 relative">
+            
+            <div class="flex justify-between items-center pb-2 border-b border-gray-100 mb-4">
+                <h2 id="verse-title" class="text-indigo-600 font-bold text-base sm:text-lg">데이터 로딩 중...</h2>
+                <!-- 점진적 힌트 버튼 -->
+                <button id="hint-btn" class="bg-amber-100 text-amber-800 hover:bg-amber-200 text-[11px] px-2.5 py-1.5 rounded font-bold transition flex items-center gap-1 shadow-sm">
+                    💡 힌트 (1단계)
+                </button>
+            </div>
+            
+            <div id="hint-box" class="hidden mb-4 p-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900 font-bold text-center tracking-widest">
+                <span id="hint-text"></span>
+            </div>
+            
+            <p id="verse-text" class="text-lg sm:text-xl leading-relaxed word-keep text-gray-700 min-h-[120px]">
+                잠시만 기다려주세요...
+            </p>
+
+            <div class="mt-8 border-t pt-4">
+                <div id="subjective-area" class="flex flex-col gap-3">
+                    <div id="subjective-inputs" class="flex flex-col gap-2"></div>
+                    <button id="submit-subjective" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded w-full sm:w-auto self-end transition">
+                        정답 제출
+                    </button>
+                </div>
+                <div id="feedback-msg" class="mt-4 text-center font-bold text-sm hidden py-2 rounded"></div>
+            </div>
+        </div>
+
+        <div class="flex justify-between mt-4">
+            <button id="prev-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded shadow hover:bg-gray-300 text-sm font-medium transition">⬅️ 이전 절</button>
+            <button id="next-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded shadow hover:bg-gray-300 text-sm font-medium transition">다음 절 ➡️</button>
+        </div>
+    </main>
+
+    <div id="note-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden justify-center items-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-xl">
+                <h3 class="font-bold text-lg text-rose-600">📝 내 오답노트</h3>
+                <button id="close-note" class="text-gray-500 hover:text-black font-bold text-xl">&times;</button>
+            </div>
+            <div id="note-content" class="p-4 overflow-y-auto flex-1 flex flex-col gap-3 text-sm"></div>
+            <div class="p-4 border-t text-right">
+                <button id="clear-note" class="text-xs bg-red-100 text-red-600 px-3 py-1 rounded hover:bg-red-200 transition">기록 초기화</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 전역 상태 변수
+        let parsedData = {};
+        let currentBook = "";
+        let currentChapter = "";
+        let versesSet = [];
+        let currentSetIndex = 0;
+        let isRandomMode = false;
+        let currentBlanks = [];
+        
+        // 🌟 신규 기능 상태 변수
+        let isReviewMode = false;     // 오답 복습 모드 활성화 여부
+        let currentHintLevel = 0;     // 현재 힌트 단계 (0: 글자수, 1: 초성, 2: 첫글자+초성)
+
+        const STOPWORDS = ["그러므로", "그러나", "이는", "곧", "또한", "이와", "같이", "먼저", "이미", "도리어", "어찌", "더욱", "이제는", "내가", "네가", "너희가", "그들이", "그가", "이것이", "누구든지", "너희도", "그들", "우리", "나", "너", "아멘", "있기를", "원하노라", "함이라", "됨이라", "하노니", "이러므로", "혹은", "무릇", "어떤", "다만", "그리고", "때문에", "위하여"];
+        const KEYWORDS = ["복음", "은혜", "그리스도", "사도", "믿음", "의", "심판", "율법", "긍휼", "사랑", "성령", "구원", "하나님", "예수", "십자가", "영광", "생명", "사망", "진리", "평강", "자비", "거룩", "언약", "지혜", "부활", "계시", "화목", "제물", "은사", "소망", "순종", "인내", "기쁨", "찬송", "기업", "육신", "권세"];
+
+        // 초성 변환기
+        function getChoSung(str) {
+            const choList = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+            let result = "";
+            for (let i = 0; i < str.length; i++) {
+                const code = str.charCodeAt(i) - 44032;
+                if (code > -1 && code < 11172) result += choList[Math.floor(code / 588)];
+                else result += str.charAt(i);
+            }
+            return result;
+        }
+
+        // 에러 표시
+        function showError(msg) {
+            document.getElementById('verse-title').innerText = "데이터 오류";
+            document.getElementById('verse-text').innerHTML = `<span class="text-red-500 font-bold">${msg}</span>`;
+            document.getElementById('subjective-area').style.display = 'none';
+        }
+
+        function initData() {
+            if (typeof BIBLE_DATABASE === 'undefined') {
+                showError("bible_data.js 파일을 찾을 수 없습니다. 같은 폴더에 있는지 확인해주세요.");
+                return;
+            }
+            
+            let dataCount = 0;
+            for (const [key, text] of Object.entries(BIBLE_DATABASE)) {
+                if (!text || text.trim() === "(없음)") continue;
+                const match = key.match(/([가-힣a-zA-Z0-9]+)\s*(\d+)\s*:\s*(.+)/);
+                if (match) {
+                    const book = match[1].trim(), chapter = match[2].trim(), verse = match[3].trim();
+                    if (!parsedData[book]) parsedData[book] = {};
+                    if (!parsedData[book][chapter]) parsedData[book][chapter] = [];
+                    parsedData[book][chapter].push({ book, chapter, verse, text, key });
+                    dataCount++;
+                }
+            }
+            if (dataCount === 0) {
+                showError("성경 데이터를 분석하지 못했습니다. bible_data.js 안의 형식을 확인해주세요.");
+                return;
+            }
+            populateBookDropdown();
+        }
+
+        // 동기화 컨트롤
+        function populateBookDropdown() {
+            const bookSel = document.getElementById('book-select');
+            const books = Object.keys(parsedData);
+            if (books.length === 0) return;
+            bookSel.innerHTML = books.map(b => `<option value="${b}">${b}</option>`).join('');
+            currentBook = books[0];
+            bookSel.value = currentBook;
+            bookSel.addEventListener('change', (e) => {
+                currentBook = e.target.value;
+                updateChapterDropdown();
+            });
+            updateChapterDropdown();
+        }
+
+        function updateChapterDropdown() {
+            const chapSel = document.getElementById('chapter-select');
+            if (!parsedData[currentBook]) return;
+            const chapters = Object.keys(parsedData[currentBook]).sort((a,b) => parseInt(a) - parseInt(b));
+            chapSel.innerHTML = chapters.map(c => `<option value="${c}">${c}장</option>`).join('');
+            currentChapter = chapters[0];
+            chapSel.value = currentChapter;
+            chapSel.addEventListener('change', (e) => {
+                currentChapter = e.target.value;
+                if(!isReviewMode) loadSet();
+            });
+            if(!isReviewMode) loadSet();
+        }
+
+        function loadSet() {
+            if (!parsedData[currentBook] || !parsedData[currentBook][currentChapter]) return;
+            versesSet = [...parsedData[currentBook][currentChapter]];
+            if (isRandomMode) versesSet.sort(() => Math.random() - 0.5);
+            else versesSet.sort((a, b) => parseInt(a.verse) - parseInt(b.verse));
+            currentSetIndex = 0;
+            renderQuiz();
+        }
+
+        // 자체 파싱 로직
+        function stripParticle(word) {
+            const particles = [/(은|는)$/, /(이|가)$/, /(을\vert{}를)$/, /(으로|로)$/, /(과\vert{}와)$/, /(에)$/, /(의)$/, /(에게|에게서)$/, /(에서\vert{}부터\vert{}까지)$/];
+            for (let r of particles) {
+                const match = word.match(r);
+                if (match) {
+                    const base = word.replace(r, '');
+                    if (base.length >= 1) return { base: base, marker: match[0] };
+                }
+            }
+            return { base: word, marker: '' };
+        }
+
+        function extractNounFromVerb(word) {
+            const verbRegex = /^(.+?)(하|되|받|당|롭|스럽)(사|고|며|여|어|아|니|면|자|지|은|는|을|를|음|기|게|다|라|시|신|셔|세|소서|옵|리|나니|거니와|더|던|지라|느니라|옵나이다|심이라|심이니|심으로|심을|시고|시니|시며|하|되|받|롭)*$/;
+            const match = word.match(verbRegex);
+            if (match) {
+                const noun = match[1];
+                if (noun.length >= 2 || KEYWORDS.includes(noun)) return { base: noun, suffix: word.substring(noun.length) };
+            }
+            return null;
+        }
+
+        function selectBlanks(text) {
+            const words = text.split(/\s+/).map((w, idx) => {
+                const match = w.match(/^([^,.?!]+)([,.?!]*)$/);
+                const wordPart = match ? match[1] : w;
+                const punctPart = match ? match[2] : "";
+                
+                let { base, marker } = stripParticle(wordPart);
+                let verbSuffix = '';
+                if (!marker) {
+                    const verbExtract = extractNounFromVerb(base);
+                    if (verbExtract) {
+                        base = verbExtract.base;
+                        verbSuffix = verbExtract.suffix;
+                    }
+                }
+                return { index: idx, original: w, wordPart, base, marker, verbSuffix, punctuation: punctPart };
+            });
+            
+            let candidates = words.filter(w => {
+                const cleanBase = w.base.replace(/[^가-힣a-zA-Z0-9]/g, '');
+                if (cleanBase.length < 2) return false; 
+                if (STOPWORDS.includes(cleanBase) || STOPWORDS.includes(w.wordPart)) return false; 
+                return true;
+            });
+
+            candidates.forEach(c => {
+                c.score = 0;
+                const cleanBase = c.base.replace(/[^가-힣]/g, '');
+                if (KEYWORDS.some(kw => cleanBase.includes(kw) || kw.includes(cleanBase))) c.score += 1000; 
+                c.score += cleanBase.length * 10; 
+                c.score += Math.random() * 10;
+            });
+            candidates.sort((a, b) => b.score - a.score);
+            
+            let targetCount = words.length <= 5 ? 1 : (Math.random() > 0.5 ? 3 : 2);
+            targetCount = Math.min(targetCount, candidates.length); 
+
+            let selected = [];
+            for (let cand of candidates) {
+                if (selected.length >= targetCount) break;
+                let isDuplicateRoot = selected.some(s => s.base.includes(cand.base) || cand.base.includes(s.base));
+                let isAdjacent = selected.some(s => Math.abs(s.index - cand.index) === 1);
+                if (!isDuplicateRoot && !isAdjacent) selected.push(cand);
+            }
+
+            if (selected.length === 0 && candidates.length > 0) selected.push(candidates[0]);
+            else if (selected.length === 0) {
+                let fallback = words.filter(w => w.base.length >= 1 && !STOPWORDS.includes(w.base));
+                if (fallback.length > 0) selected.push(fallback[0]);
+            }
+            return selected.sort((a, b) => a.index - b.index);
+        }
+
+        // 화면 렌더링
+        function updateProgress() {
+            if (!versesSet || versesSet.length === 0) return;
+            const fill = document.getElementById('progress-fill');
+            const percent = ((currentSetIndex + 1) / versesSet.length) * 100;
+            fill.style.width = `${percent}%`;
+
+            const verseSel = document.getElementById('verse-select');
+            
+            // 💡 복습 모드 시 셀렉터 비활성화 및 텍스트 변경
+            if (isReviewMode) {
+                verseSel.innerHTML = `<option>복습 ${currentSetIndex + 1}/${versesSet.length}</option>`;
+                verseSel.disabled = true;
+                document.getElementById('book-select').disabled = true;
+                document.getElementById('chapter-select').disabled = true;
+                document.getElementById('order-toggle').disabled = true;
+            } else {
+                verseSel.disabled = false;
+                document.getElementById('book-select').disabled = false;
+                document.getElementById('chapter-select').disabled = false;
+                document.getElementById('order-toggle').disabled = false;
+
+                const originalVerses = parsedData[currentBook][currentChapter];
+                if(originalVerses) {
+                    verseSel.innerHTML = originalVerses.map((v, i) => `<option value="${i}">${v.verse}절</option>`).join('');
+                    const currentVerseData = versesSet[currentSetIndex];
+                    const originalIndex = originalVerses.findIndex(v => v.verse === currentVerseData.verse);
+                    if (originalIndex !== -1) verseSel.value = originalIndex;
+
+                    verseSel.onchange = (e) => {
+                        const targetVerseStr = originalVerses[e.target.value].verse;
+                        const setIdx = versesSet.findIndex(v => v.verse === targetVerseStr);
+                        if(setIdx !== -1) { currentSetIndex = setIdx; renderQuiz(); }
+                    };
+                }
+            }
+        }
+
+        function renderQuiz() {
+            if (!versesSet || versesSet.length === 0 || !versesSet[currentSetIndex]) {
+                if (isReviewMode) {
+                    alert("🎉 모든 오답 복습을 완료했습니다!");
+                    document.getElementById('review-toggle').click(); // 복습 모드 자동 종료
+                }
+                return;
+            }
+            
+            updateProgress();
+            const verseData = versesSet[currentSetIndex];
+            
+            // 타이틀 변경 (일반 모드 vs 복습 모드)
+            document.getElementById('verse-title').innerText = isReviewMode ? `[복습] ${verseData.key}` : verseData.key;
+            
+            currentBlanks = selectBlanks(verseData.text);
+            
+            // 💡 힌트 시스템 초기화 (문제 넘어갈 때마다)
+            currentHintLevel = 0;
+            const hintBtn = document.getElementById('hint-btn');
+            hintBtn.innerText = "💡 힌트 (1단계)";
+            hintBtn.disabled = false;
+            hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            document.getElementById('hint-box').classList.add('hidden');
+            document.getElementById('hint-text').innerText = "";
+
+            const words = verseData.text.split(/\s+/);
+            let html = '';
+            
+            words.forEach((w, idx) => {
+                const blank = currentBlanks.find(b => b.index === idx);
+                if (blank) {
+                    const blankNum = currentBlanks.indexOf(blank) + 1;
+                    let tailHtml = '';
+                    if (blank.verbSuffix) tailHtml = `<span class="text-gray-800 font-medium text-[0.95em]">${blank.verbSuffix}</span>`;
+                    else if (blank.marker) tailHtml = `<span class="text-gray-800 font-medium text-[0.95em]">${blank.marker}</span>`;
+
+                    html += `<span class="inline-block mx-1 font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded border border-indigo-200 shadow-sm align-middle">
+                        ①②③④⑤⑥⑦⑧⑨⑩[blankNum-1] <span class="tracking-widest text-transparent">빈칸</span>
+                    </span>${tailHtml}${blank.punctuation} `.replace('①②③④⑤⑥⑦⑧⑨⑩[blankNum-1]', ['①','②','③','④','⑤'][blankNum-1]);
+                } else {
+                    html += w + ' ';
+                }
+            });
+            document.getElementById('verse-text').innerHTML = html;
+            document.getElementById('feedback-msg').className = 'mt-4 text-center font-bold text-sm hidden py-2 rounded';
+            
+            renderSubjective();
+        }
+
+        function renderSubjective() {
+            document.getElementById('submit-subjective').disabled = false;
+            const container = document.getElementById('subjective-inputs');
+            
+            container.innerHTML = currentBlanks.map((b, i) => {
+                const hintStr = b.base.split('').map(c => c === ' ' ? '_' : 'O').join('');
+                return `
+                <div class="flex items-center gap-3">
+                    <span class="font-bold text-indigo-600 w-6">${['①','②','③','④'][i]}</span>
+                    <input type="text" id="subj-input-${i}" class="flex-1 p-2 border border-gray-300 rounded outline-none focus:border-indigo-500 text-sm bg-white transition-colors tracking-widest font-bold text-gray-700" placeholder="${hintStr}">
+                </div>
+            `}).join('');
+            
+            setTimeout(() => document.getElementById('subj-input-0')?.focus(), 50);
+
+            container.querySelectorAll('input').forEach((inp, i) => {
+                inp.addEventListener('input', (e) => {
+                    const userVal = e.target.value.replace(/\s+/g, '');
+                    const correctVal = currentBlanks[i].base.replace(/\s+/g, '');
+
+                    inp.classList.remove('border-gray-300', 'border-green-500', 'border-red-500', 'text-green-700', 'text-red-700', 'bg-white', 'bg-green-50', 'bg-red-50');
+
+                    if (userVal === "") inp.classList.add('border-gray-300', 'bg-white');
+                    else if (userVal === correctVal) inp.classList.add('border-green-500', 'text-green-700', 'bg-green-50');
+                    else inp.classList.add('border-red-500', 'text-red-700', 'bg-red-50');
+
+                    document.getElementById('submit-subjective').disabled = false;
+                    document.getElementById('feedback-msg').classList.add('hidden');
+                });
+
+                inp.addEventListener('keypress', (e) => {
+                    if(e.key === 'Enter') {
+                        e.preventDefault();
+                        const nextInput = document.getElementById(`subj-input-${i + 1}`);
+                        if (nextInput) nextInput.focus();
+                        else checkSubjectiveAnswer();
+                    }
+                });
+            });
+        }
+
+        // 🌟 점진적 힌트 버튼 로직
+        document.getElementById('hint-btn').addEventListener('click', () => {
+            if (!currentBlanks.length || currentHintLevel >= 2) return;
+            
+            const hintBox = document.getElementById('hint-box');
+            const hintText = document.getElementById('hint-text');
+            const hintBtn = document.getElementById('hint-btn');
+            
+            currentHintLevel++;
+            hintBox.classList.remove('hidden');
+
+            if (currentHintLevel === 1) {
+                // 1단계: 전체 초성 공개
+                hintText.innerText = currentBlanks.map((b, i) => `${i+1}번: ${getChoSung(b.base)}`).join('  |  ');
+                hintBtn.innerText = "💡 강력한 힌트 (2단계)";
+            } else if (currentHintLevel === 2) {
+                // 2단계: 첫 글자 + 나머지 초성 공개
+                hintText.innerText = currentBlanks.map((b, i) => {
+                    const firstChar = b.base.charAt(0);
+                    const restChoSung = getChoSung(b.base.substring(1));
+                    return `${i+1}번: ${firstChar}${restChoSung}`;
+                }).join('  |  ');
+                hintBtn.innerText = "💡 힌트 모두 소진됨";
+                hintBtn.disabled = true;
+                hintBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        });
+
+        function getCorrectString() {
+            return currentBlanks.map(b => b.base).join(' - ');
+        }
+
+        function showFeedback(isCorrect) {
+            const msg = document.getElementById('feedback-msg');
+            msg.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
+            
+            if (isCorrect) {
+                document.getElementById('submit-subjective').disabled = true;
+                msg.classList.add('bg-green-100', 'text-green-700');
+                msg.innerText = isReviewMode ? "🎉 정답! (오답노트에서 삭제됨)" : "🎉 완벽합니다! 정답입니다.";
+                setTimeout(() => nextQuestion(), 800);
+            } else {
+                document.getElementById('submit-subjective').disabled = false;
+                msg.classList.add('bg-red-100', 'text-red-700');
+                msg.innerText = `❌ 오답입니다. 다시 확인해보세요! (정답: ${getCorrectString()})`;
+            }
+        }
+
+        function checkSubjectiveAnswer() {
+            let userAnsArr = [];
+            for(let i=0; i<currentBlanks.length; i++) {
+                userAnsArr.push(document.getElementById(`subj-input-${i}`).value.trim());
+            }
+            const selectedStr = userAnsArr.join(' - ');
+            const correctStr = getCorrectString();
+            
+            if (selectedStr.replace(/\s/g,'') === correctStr.replace(/\s/g,'')) {
+                // 🌟 복습 모드에서 맞추면 오답노트에서 삭제
+                if (isReviewMode) {
+                    let notes = JSON.parse(localStorage.getItem('bible_quiz_notes') || '[]');
+                    notes = notes.filter(n => n.key !== versesSet[currentSetIndex].key);
+                    localStorage.setItem('bible_quiz_notes', JSON.stringify(notes));
+                }
+                showFeedback(true);
+            } else {
+                saveToNote(selectedStr, correctStr);
+                showFeedback(false);
+            }
+        }
+
+        document.getElementById('submit-subjective').addEventListener('click', checkSubjectiveAnswer);
+
+        function nextQuestion() {
+            if (currentSetIndex < versesSet.length - 1) {
+                currentSetIndex++;
+                renderQuiz();
+            } else {
+                if (isReviewMode) {
+                    alert("🎉 복습 모드의 모든 문제를 풀었습니다!");
+                    document.getElementById('review-toggle').click(); // 일반 모드로 복귀
+                } else {
+                    alert("현재 장의 모든 퀴즈를 풀었습니다!");
+                    document.getElementById('progress-fill').style.width = '100%';
+                }
+            }
+        }
+
+        document.getElementById('prev-btn').addEventListener('click', () => {
+            if(currentSetIndex > 0) { currentSetIndex--; renderQuiz(); }
+        });
+        document.getElementById('next-btn').addEventListener('click', nextQuestion);
+
+        // 🌟 버튼 및 모달 로직
+        const orderBtn = document.getElementById('order-toggle');
+        orderBtn.addEventListener('click', () => {
+            isRandomMode = !isRandomMode;
+            orderBtn.innerText = isRandomMode ? "🔀 랜덤" : "➡️ 순차";
+            loadSet();
+        });
+
+        // 🌟 오답 복습 모드 토글 로직
+        const reviewBtn = document.getElementById('review-toggle');
+        reviewBtn.addEventListener('click', () => {
+            isReviewMode = !isReviewMode;
+            
+            if (isReviewMode) {
+                let notes = JSON.parse(localStorage.getItem('bible_quiz_notes') || '[]');
+                if (notes.length === 0) {
+                    alert("기록된 오답이 없습니다. 퀴즈를 풀면서 오답을 누적해보세요!");
+                    isReviewMode = false;
+                    return;
+                }
+                
+                // UI 변경
+                reviewBtn.classList.replace('bg-amber-500', 'bg-emerald-500');
+                reviewBtn.classList.replace('hover:bg-amber-400', 'hover:bg-emerald-400');
+                reviewBtn.innerText = "🔙 일반 모드";
+                
+                // 오답 노트 데이터를 versesSet 구조로 맵핑
+                versesSet = notes.map(n => {
+                    const match = n.key.match(/([가-힣a-zA-Z0-9]+)\s*(\d+)\s*:\s*(.+)/);
+                    return {
+                        book: match ? match[1].trim() : "알수없음",
+                        chapter: match ? match[2].trim() : "0",
+                        verse: match ? match[3].trim() : "0",
+                        text: n.text,
+                        key: n.key
+                    };
+                });
+                
+                currentSetIndex = 0;
+                renderQuiz();
+                alert(`총 ${versesSet.length}개의 오답 복습을 시작합니다!`);
+
+            } else {
+                // 일반 모드 복귀
+                reviewBtn.classList.replace('bg-emerald-500', 'bg-amber-500');
+                reviewBtn.classList.replace('hover:bg-emerald-400', 'hover:bg-amber-400');
+                reviewBtn.innerText = "🔥 오답 복습";
+                
+                loadSet(); // 기존에 선택된 장/절 세트 다시 로드
+            }
+        });
+
+        function saveToNote(wrongVal, correctVal) {
+            let notes = JSON.parse(localStorage.getItem('bible_quiz_notes') || '[]');
+            const key = versesSet[currentSetIndex].key;
+            notes = notes.filter(n => n.key !== key); 
+            notes.unshift({
+                key: key,
+                text: versesSet[currentSetIndex].text,
+                wrong: wrongVal,
+                correct: correctVal,
+                date: new Date().toLocaleString()
+            });
+            localStorage.setItem('bible_quiz_notes', JSON.stringify(notes));
+        }
+
+        function renderNotes() {
+            const notes = JSON.parse(localStorage.getItem('bible_quiz_notes') || '[]');
+            const container = document.getElementById('note-content');
+            if (notes.length === 0) {
+                container.innerHTML = "<p class='text-center text-gray-500 py-10'>오답 기록이 없습니다.</p>";
+                return;
+            }
+            container.innerHTML = notes.map(n => `
+                <div class="border rounded p-3 bg-white shadow-sm">
+                    <div class="flex justify-between border-b pb-1 mb-2">
+                        <strong class="text-indigo-600">${n.key}</strong>
+                        <span class="text-xs text-gray-400">${n.date}</span>
+                    </div>
+                    <p class="text-gray-600 text-xs mb-2 word-keep">${n.text}</p>
+                    <div class="bg-red-50 p-2 rounded text-xs mb-1">
+                        <span class="font-bold text-red-500">내 답안:</span> ${n.wrong || '(빈칸)'}
+                    </div>
+                    <div class="bg-green-50 p-2 rounded text-xs">
+                        <span class="font-bold text-green-600">정답:</span> ${n.correct}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('note-btn').addEventListener('click', () => {
+            renderNotes();
+            document.getElementById('note-modal').classList.remove('hidden');
+            document.getElementById('note-modal').classList.add('flex');
+        });
+        
+        document.getElementById('close-note').addEventListener('click', () => {
+            document.getElementById('note-modal').classList.add('hidden');
+            document.getElementById('note-modal').classList.remove('flex');
+        });
+
+        document.getElementById('clear-note').addEventListener('click', () => {
+            if(confirm("모든 오답 기록을 지우시겠습니까?")) {
+                localStorage.removeItem('bible_quiz_notes');
+                renderNotes();
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', initData);
+    </script>
+</body>
+</html>
